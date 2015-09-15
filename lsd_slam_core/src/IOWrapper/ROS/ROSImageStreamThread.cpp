@@ -60,8 +60,7 @@ ROSImageStreamThread::ROSImageStreamThread()
 	width_ = height_ = 0;
 
 	// imagebuffer
-	imageBuffer = new NotifyBuffer<TimestampedMat>(8);
-	depthBuffer = new NotifyBuffer<TimestampedMat>(8);
+	imageBuffer = new NotifyBuffer<TimestampedMatPair>(8);
 	undistorter = 0;
 	lastSEQ = 0;
 
@@ -70,7 +69,6 @@ ROSImageStreamThread::ROSImageStreamThread()
 
 ROSImageStreamThread::~ROSImageStreamThread()
 {
-    delete depthBuffer;
 	delete imageBuffer;
 }
 
@@ -126,7 +124,7 @@ void ROSImageStreamThread::operator()()
 
 void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 {
-	if(!haveCalib) {vidCbRetVal = false; return;}
+	if(!haveCalib) return;
 
     // FIXME: change Copy to Share
 	cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
@@ -135,12 +133,11 @@ void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 	{
 		printf("Backward-Jump in SEQ detected, but ignoring for now.\n");
 		lastSEQ = 0;
-		vidCbRetVal = false;
         return;
 	}
 	lastSEQ = img->header.seq;
 
-	TimestampedMat bufferItem;
+	TimestampedMatPair bufferItem;
 	if(img->header.stamp.toSec() != 0)
 		bufferItem.timestamp =  Timestamp(img->header.stamp.toSec());
 	else
@@ -157,32 +154,46 @@ void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 	}
 
 	imageBuffer->pushBack(bufferItem);
-    vidCbRetVal = true;
     return;
 }
 
-void ROSImageStreamThread::vidDepthCb(const sensor_msgs::ImageConstPtr &image, const sensor_msgs::ImageConstPtr &depth)
+void ROSImageStreamThread::vidDepthCb(const sensor_msgs::ImageConstPtr &img, const sensor_msgs::ImageConstPtr &depth)
 {
-    ROS_DEBUG("vidDepthCb");
-    vidCb(image);
-    if(!vidCbRetVal) return;
+	if(!haveCalib) return;
 
     // FIXME: change Copy to Share
-	cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_32FC1);
+	cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+	cv_bridge::CvImagePtr cv_ptr1 = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_32FC1);
 
-	TimestampedMat bufferItem;
-	if(depth->header.stamp.toSec() != 0)
-		bufferItem.timestamp =  Timestamp(depth->header.stamp.toSec());
+	if(img->header.seq < (unsigned int)lastSEQ)
+	{
+		printf("Backward-Jump in SEQ detected, but ignoring for now.\n");
+		lastSEQ = 0;
+        return;
+	}
+	lastSEQ = img->header.seq;
+
+	TimestampedMatPair bufferItem;
+	if(img->header.stamp.toSec() != 0)
+		bufferItem.timestamp =  Timestamp(img->header.stamp.toSec());
 	else
 		bufferItem.timestamp =  Timestamp(ros::Time::now().toSec());
-    bufferItem.data = cv_ptr->image;
-    depthBuffer->pushBack(bufferItem);
 
-    ROS_DEBUG("Pushed an image and its depth");
+	if(undistorter != 0)
+	{
+		assert(undistorter->isValid());
+		undistorter->undistort(cv_ptr->image,bufferItem.data);
+        undistorter->undistort(cv_ptr1->image,bufferItem.data1);
+	}
+	else
+	{
+		bufferItem.data = cv_ptr->image;
+        bufferItem.data1 = cv_ptr1->image;
+	}
+
+	imageBuffer->pushBack(bufferItem);
+    return;
 }
-
-
-
 
 void ROSImageStreamThread::infoCb(const sensor_msgs::CameraInfoConstPtr info)
 {

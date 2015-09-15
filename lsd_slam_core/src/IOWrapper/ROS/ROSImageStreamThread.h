@@ -72,7 +72,6 @@ private:
 
 	bool haveCalib;
     bool useDepth;
-    bool vidCbRetVal;
 	Undistorter* undistorter;
 
 	ros::NodeHandle nh_;

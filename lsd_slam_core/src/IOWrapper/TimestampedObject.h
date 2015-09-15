@@ -38,7 +38,16 @@ struct TimestampedObject
 	Timestamp timestamp;
 };
 
+template<typename T, typename U>
+struct TimestampedObjectPair
+{
+    T data;
+    U data1;
+    Timestamp timestamp;
+};
+
 typedef TimestampedObject< cv::Mat > TimestampedMat;
+typedef TimestampedObjectPair< cv::Mat, cv::Mat > TimestampedMatPair;
 
 }
 #endif
