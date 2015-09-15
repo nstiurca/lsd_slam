@@ -104,12 +104,12 @@ void LiveSLAMWrapper::Loop()
 		
 		// process image
 		//Util::displayImage("MyVideo", image.data);
-		newImageCallback(image.data, image.timestamp);
+		newImageCallback(image.data, image.data1, image.timestamp);
 	}
 }
 
 
-void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, Timestamp imgTime)
+void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, const cv::Mat& depth, Timestamp imgTime)
 {
 	++ imageSeqNumber;
 
@@ -129,7 +129,10 @@ void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, Timestamp imgTime)
 	// need to initialize
 	if(!isInitialized)
 	{
-		monoOdometry->randomInit(grayImg.data, imgTime.toSec(), 1);
+        if(depth.data)
+            monoOdometry->gtDepthInit(grayImg.data, (float*)depth.data, imgTime.toSec(), 1);
+        else
+    		monoOdometry->randomInit(grayImg.data, imgTime.toSec(), 1);
 		isInitialized = true;
 	}
 	else if(isInitialized && monoOdometry != nullptr)
