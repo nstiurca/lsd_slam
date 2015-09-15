@@ -99,7 +99,7 @@ void LiveSLAMWrapper::Loop()
 				continue;
 		}
 		
-		TimestampedMat image = imageStream->getBuffer()->first();
+		TimestampedMatPair image = imageStream->getBuffer()->first();
 		imageStream->getBuffer()->popFront();
 		
 		// process image
