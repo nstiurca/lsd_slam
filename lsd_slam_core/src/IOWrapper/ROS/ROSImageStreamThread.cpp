@@ -159,6 +159,7 @@ void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 
 void ROSImageStreamThread::vidDepthCb(const sensor_msgs::ImageConstPtr &img, const sensor_msgs::ImageConstPtr &depth)
 {
+    ROS_DEBUG_THROTTLED(1, "vidDepthCb");
 	if(!haveCalib) return;
 
     // FIXME: change Copy to Share
