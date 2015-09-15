@@ -137,7 +137,7 @@ void LiveSLAMWrapper::newImageCallback(const cv::Mat& img, const cv::Mat& depth,
 	}
 	else if(isInitialized && monoOdometry != nullptr)
 	{
-		monoOdometry->trackFrame(grayImg.data,imageSeqNumber,false,imgTime.toSec());
+		monoOdometry->trackFrame(grayImg.data, imageSeqNumber,false,imgTime.toSec(),(float*)depth.data);
 	}
 }
 
