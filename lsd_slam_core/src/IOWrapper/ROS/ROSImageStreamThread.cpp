@@ -38,10 +38,22 @@ namespace lsd_slam
 using namespace cv;
 
 ROSImageStreamThread::ROSImageStreamThread()
+    : sync(ImageImageSyncPolicy(5), image_sub, depth_sub)
 {
+    ros::NodeHandle ph("~");
+    ph.param<bool>("use_depth", useDepth, true);
 	// subscribe
 	vid_channel = nh_.resolveName("image");
-	vid_sub          = nh_.subscribe(vid_channel,1, &ROSImageStreamThread::vidCb, this);
+	depth_channel = nh_.resolveName("depth");
+    if(useDepth) {
+        image_sub.subscribe(nh_, vid_channel, 5);
+        depth_sub.subscribe(nh_, depth_channel, 5);
+        //TODO: FIXME sync.<initialize>;
+        sync.registerCallback(boost::bind(&ROSImageStreamThread::vidDepthCb, this, _1, _2));
+        ROS_INFO("Registered sync callback");
+    } else {
+    	vid_sub = nh_.subscribe(vid_channel,1, &ROSImageStreamThread::vidCb, this);
+    }
 
 
 	// wait for cam calib
@@ -49,6 +61,7 @@ ROSImageStreamThread::ROSImageStreamThread()
 
 	// imagebuffer
 	imageBuffer = new NotifyBuffer<TimestampedMat>(8);
+	depthBuffer = new NotifyBuffer<TimestampedMat>(8);
 	undistorter = 0;
 	lastSEQ = 0;
 
@@ -57,6 +70,7 @@ ROSImageStreamThread::ROSImageStreamThread()
 
 ROSImageStreamThread::~ROSImageStreamThread()
 {
+    delete depthBuffer;
 	delete imageBuffer;
 }
 
@@ -112,15 +126,17 @@ void ROSImageStreamThread::operator()()
 
 void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 {
-	if(!haveCalib) return;
+	if(!haveCalib) {vidCbRetVal = false; return;}
 
+    // FIXME: change Copy to Share
 	cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
 
 	if(img->header.seq < (unsigned int)lastSEQ)
 	{
 		printf("Backward-Jump in SEQ detected, but ignoring for now.\n");
 		lastSEQ = 0;
-		return;
+		vidCbRetVal = false;
+        return;
 	}
 	lastSEQ = img->header.seq;
 
@@ -141,7 +157,32 @@ void ROSImageStreamThread::vidCb(const sensor_msgs::ImageConstPtr img)
 	}
 
 	imageBuffer->pushBack(bufferItem);
+    vidCbRetVal = true;
+    return;
 }
+
+void ROSImageStreamThread::vidDepthCb(const sensor_msgs::ImageConstPtr &image, const sensor_msgs::ImageConstPtr &depth)
+{
+    ROS_DEBUG("vidDepthCb");
+    vidCb(image);
+    if(!vidCbRetVal) return;
+
+    // FIXME: change Copy to Share
+	cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_32FC1);
+
+	TimestampedMat bufferItem;
+	if(depth->header.stamp.toSec() != 0)
+		bufferItem.timestamp =  Timestamp(depth->header.stamp.toSec());
+	else
+		bufferItem.timestamp =  Timestamp(ros::Time::now().toSec());
+    bufferItem.data = cv_ptr->image;
+    depthBuffer->pushBack(bufferItem);
+
+    ROS_DEBUG("Pushed an image and its depth");
+}
+
+
+
 
 void ROSImageStreamThread::infoCb(const sensor_msgs::CameraInfoConstPtr info)
 {
