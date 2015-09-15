@@ -64,6 +64,7 @@ public:
 
 protected:
 	NotifyBuffer<TimestampedMat>* imageBuffer;
+	NotifyBuffer<TimestampedMat>* depthBuffer;
 	float fx_, fy_, cx_, cy_;
 	int width_, height_;
 };

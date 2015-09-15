@@ -26,6 +26,9 @@
 
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -63,16 +66,25 @@ public:
 	// get called on ros-message callbacks
 	void vidCb(const sensor_msgs::ImageConstPtr img);
 	void infoCb(const sensor_msgs::CameraInfoConstPtr info);
+    void vidDepthCb(const sensor_msgs::ImageConstPtr &image, const sensor_msgs::ImageConstPtr &depth);
 
 private:
 
 	bool haveCalib;
+    bool useDepth;
+    bool vidCbRetVal;
 	Undistorter* undistorter;
 
 	ros::NodeHandle nh_;
 
 	std::string vid_channel;
-	ros::Subscriber vid_sub;
+    std::string depth_channel;
+    ros::Subscriber vid_sub;
+    message_filters::Subscriber<sensor_msgs::Image> image_sub;
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub;
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> ImageImageSyncPolicy;
+    message_filters::Synchronizer<ImageImageSyncPolicy> sync;
+
 
 	int lastSEQ;
 };

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="camera" default="camera"/>
+    <arg name="use_depth" default="True"/>
+
+    <!--node pkg="lsd_slam_viewer" type="viewer" name="viewer"/-->
+
+    <group ns="$(arg camera)">
+        <group ns="depth">
+            <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager"/>
+            <node pkg="nodelet" type="nodelet" name="depth_image_proc_nodelet" args="load depth_image_proc/convert_metric nodelet_manager"/>
+        </group>
+        <group ns="rgb">
+            <node pkg="image_view" type="image_view" name="image_view">
+                <remap from="image" to="image_mono"/>
+            </node>
+            <node pkg="image_proc" type="image_proc" name="image_proc"/>
+        </group>
+        <node pkg="lsd_slam_core" type="live_slam" name="live_slam" respawn="True" output="screen">
+            <remap from="image" to="rgb/image_rect"/>
+            <remap from="camera_info" to="rgb/camera_info"/>
+            <remap from="depth" to="depth/image"/>
+            <param name="use_depth" value="$(arg use_depth)"/>
+        </node>
+    </group>
+
+</launch>
